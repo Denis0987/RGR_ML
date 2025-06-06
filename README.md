@@ -39,13 +39,13 @@
      - Ручной ввод признаков объекта ➔ единичное предсказание.  
      - Вывод результата в понятном формате (например, цена в доллары США с разделителем тысяч).  
      - Отображение первых 10 строк загруженных данных с колонкой `predicted_price`. 
-   - на **Streamlit Cloud** с развернутым веб-приложением: https://6ih4ygnagqurhqmnwsuocn.streamlit.app/
+   - на **Streamlit Cloud** с развернутым веб-приложением: https://lk375mrkvrjqpaebqcljep.streamlit.app/
 
 ---
 
 ## Структура репозитория
 ```text
-ML/  
+RGR_ML/  
 ├─ README.md                       ← Документация проекта (текущий файл)  
 ├─ requirements.txt                ← Список Python-зависимостей для pip install   
 ├─ df_cars.csv                     ← Оригинальный CSV-набор 
