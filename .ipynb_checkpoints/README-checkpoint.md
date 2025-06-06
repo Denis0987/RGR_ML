@@ -49,6 +49,7 @@ ML/
 ├─ README.md                       ← Документация проекта (текущий файл)  
 ├─ requirements.txt                ← Список Python-зависимостей для pip install   
 ├─ df_cars.csv                     ← Оригинальный CSV-набор 
+├─ photo_2025-06-07_00-18-02.jpg   ← Фотография студента
 │    
 │  
 ├─ models/                         ← Сохранённые модели (pickle, CatBoost .json)  
