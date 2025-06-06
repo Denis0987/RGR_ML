@@ -2,12 +2,12 @@ import streamlit as st
 import pandas as pd
 import pickle
 import os
-import xgboost as xgb
+from catboost import CatBoostRegressor
 from sklearn.preprocessing import LabelEncoder
 
 # Установка заголовка страницы
 st.set_page_config(page_title="Предсказание", layout="centered")
-st.title("Прогнозирование стоимости недвижимости")
+st.title("Прогнозирование стоимости автомобиля")
 
 st.markdown("Загрузите CSV-файл или введите данные вручную для получения прогноза.")
 
@@ -19,10 +19,10 @@ if not os.path.exists(models_dir):
     st.error(f"Папка с моделями не найдена: {models_dir}")
 else:
     # Получаем список всех .pkl и .json файлов
-    model_files = [f for f in os.listdir(models_dir) if f.endswith('.pkl') or f.endswith('.json')]
+    model_files = [f for f in os.listdir(models_dir) if f.endswith('.pkl') or f.endswith('.json') or f.endswith('.cbm')]
 
     if not model_files:
-        st.warning("В папке models нет моделей (.pkl или .json файлов)")
+        st.warning("В папке models нет моделей (.pkl, .json или .cbm файлов)")
     else:
         # Выбор модели пользователем
         selected_model = st.selectbox("Выберите модель", model_files)
@@ -33,17 +33,28 @@ else:
             with open(model_path, "rb") as f:
                 model = pickle.load(f)
             st.success(f"Модель '{selected_model}' (.pkl) загружена")
-        elif selected_model.endswith('.json'):
-            model = xgb.XGBRegressor()
-            model.load_model(model_path)
-            st.success(f"Модель '{selected_model}' (.json, XGBoost) загружена")
+        elif selected_model.endswith('.json') or selected_model.endswith('.cbm'):
+            model = CatBoostRegressor()
+            model.load_model(model_path)  # Загружаем модель CatBoost
+            st.success(f"Модель '{selected_model}' (.json, .cbm, CatBoost) загружена")
         else:
             st.error("Неподдерживаемый формат модели!")
             model = None
 
         if model is not None:
-            # Получаем список признаков модели
-            model_columns = model.feature_names_in_ if hasattr(model, 'feature_names_in_') else model.get_booster().get_fscore().keys()
+            # Для CatBoost мы извлекаем признаки из модели
+            if isinstance(model, CatBoostRegressor):
+                model_columns = model.feature_names_
+            else:
+                # Здесь указываем все признаки, которые использовались при обучении модели
+                model_columns = [
+                    'odometer_value', 'year_produced', 'engine_has_gas', 'engine_capacity', 'has_warranty', 
+                    'is_exchangeable', 'number_of_photos', 'up_counter', 'feature_0', 'feature_1', 'feature_2', 
+                    'feature_3', 'feature_4', 'feature_5', 'feature_6', 'feature_7', 'feature_8', 'feature_9', 
+                    'duration_listed', 'car_age', 'region_ad_count', 'manufacturer_name_encoded', 'model_name_encoded', 
+                    'transmission_encoded', 'color_encoded', 'engine_fuel_encoded', 'engine_type_encoded', 'body_type_encoded', 
+                    'state_encoded', 'drivetrain_encoded', 'location_region_encoded'
+                ]
 
             # Разделение на две колонки: загрузка файла и ручной ввод
             col1, col2 = st.columns(2)
@@ -53,115 +64,105 @@ else:
                 uploaded_file = st.file_uploader("Выберите CSV-файл", type=["csv"])
                 if uploaded_file:
                     try:
-                        df_uploaded = pd.read_csv(uploaded_file)
+                        # Загрузим CSV-файл
+                        df = pd.read_csv(uploaded_file)
                         st.success("Файл успешно загружен!")
                         st.write("Предпросмотр данных:")
-                        st.dataframe(df_uploaded.head())
+                        st.dataframe(df.head())
+
+                        # Удаляем целевой признак price_usd из данных для предсказания
+                        df = df.drop('price_usd', axis=1, errors='ignore')
 
                         # Обработка пропущенных значений
-                        df_uploaded = df_uploaded.fillna(0)  # Заполняем пропуски нулями
+                        df = df.fillna(0)  # Заполняем пропуски нулями
 
                         # Преобразуем категориальные признаки в one-hot (если необходимо)
-                        df_uploaded = pd.get_dummies(df_uploaded, drop_first=True)
+                        df = pd.get_dummies(df, drop_first=True)
 
-                        # Приводим данные в такой же порядок, как и в модели
-                        missing_columns = set(model_columns) - set(df_uploaded.columns)
+                        # Обработка всех недостающих признаков, если они отсутствуют в новых данных
+                        missing_columns = set(model_columns) - set(df.columns)
                         for col in missing_columns:
-                            df_uploaded[col] = 0  # Добавляем недостающие признаки с нулевым значением
+                            df[col] = 0  # Добавляем недостающие признаки с нулевыми значениями
 
                         # Приводим порядок признаков к нужному
-                        df_uploaded = df_uploaded[model_columns]  # Применяем правильный порядок
+                        df = df[model_columns]  # Применяем правильный порядок признаков
 
                         # Предсказание по файлу
-                        X = df_uploaded
+                        X = df
                         predictions = model.predict(X)
-                        df_uploaded['predicted_trip_duration'] = predictions
+                        df['predicted_price'] = predictions
                         st.download_button(
                             label="Скачать с предсказаниями",
-                            data=df_uploaded.to_csv(index=False),
+                            data=df.to_csv(index=False),
                             file_name="predictions.csv",
                             mime="text/csv"
                         )
 
                         # Показываем первые 10 строк с предсказаниями
                         st.subheader("Предсказания для загруженных данных:")
-                        st.write(df_uploaded.head(10))  # Показываем 10 строк с предсказаниями
+                        st.write(df.head(10))  # Показываем 10 строк с предсказаниями
 
                     except Exception as e:
                         st.error(f"Ошибка при обработке файла: {e}")
 
             with col2:
-                st.subheader("Ввод параметров объекта недвижимости вручную")
+                st.subheader("Ввод параметров автомобиля вручную")
 
-                area = st.number_input("Площадь (кв.м):", min_value=10.0, max_value=10000.0, value=50.0)
-                price = st.number_input("Цена (в рупиях):", min_value=0.0, max_value=10_000_000_000.0, value=5000000.0)
-                latitude = st.number_input("Ширина (latitude):", min_value=-90.0, max_value=90.0, value=19.0760)
-                longitude = st.number_input("Долгота (longitude):", min_value=-180.0, max_value=180.0, value=72.8777)
-                bedrooms = st.number_input("Количество спален:", min_value=1, max_value=10, value=2)
-                bathrooms = st.number_input("Количество ванных комнат:", min_value=1, max_value=10, value=1)
-                balcony = st.number_input("Количество балконов:", min_value=0, max_value=10, value=1)
-                parking = st.number_input("Наличие парковки (1 — есть, 0 — нет):", min_value=0, max_value=1, value=1)
-                lift = st.number_input("Наличие лифта (1 — есть, 0 — нет):", min_value=0, max_value=1, value=1)
+                manufacturer_name = st.text_input("Название производителя автомобиля")
+                model_name = st.text_input("Модель автомобиля")
+                transmission = st.selectbox("Тип трансмиссии", ["Автоматическая", "Механическая"])
+                color = st.text_input("Цвет автомобиля")
+                odometer_value = st.number_input("Пробег автомобиля (км или милях):", min_value=0.0, value=0.0)
+                year_produced = st.number_input("Год выпуска автомобиля:", min_value=1900, max_value=2022, value=2020)
+                engine_fuel = st.selectbox("Тип топлива", ["Бензин", "Дизель", "Электричество"])
+                engine_has_gas = st.selectbox("Наличие газового оборудования", ["True", "False"])
+                engine_type = st.selectbox("Тип двигателя", ["Бензиновый", "Дизельный", "Гибридный"])
+                engine_capacity = st.number_input("Объем двигателя (л):", min_value=0.0, value=2.0)
+                body_type = st.selectbox("Тип кузова", ["Седан", "Хэтчбек", "Внедорожник"])
+                has_warranty = st.selectbox("Наличие гарантии", ["True", "False"])
+                state = st.selectbox("Состояние автомобиля", ["Новый", "Б/У"])
+                drivetrain = st.selectbox("Тип привода", ["Передний", "Задний", "Полный"])
+                is_exchangeable = st.selectbox("Возможность обмена", ["True", "False"])
+                location_region = st.text_input("Регион, где находится автомобиль")
+                number_of_photos = st.number_input("Количество фотографий автомобиля:", min_value=1, max_value=100, value=5)
+                up_counter = st.number_input("Количество поднятий объявления:", min_value=1, max_value=100, value=3)
 
-                # Статус недвижимости
-                status = st.selectbox("Статус недвижимости", [
-                    "Ready to Move", "Under Construction", "unknown"
-                ])
-                status_ready = 1 if status == "Ready to Move" else 0
-                status_under = 1 if status == "Under Construction" else 0
-                status_unknown = 1 if status == "unknown" else 0
+                # Преобразование бинарных признаков
+                engine_has_gas = 1 if engine_has_gas == "True" else 0
+                has_warranty = 1 if has_warranty == "True" else 0
+                is_exchangeable = 1 if is_exchangeable == "True" else 0
 
-                # Тип здания
-                type_building = st.selectbox("Тип здания", [
-                    "Flat", "Individual House"
-                ])
-                type_flat = 1 if type_building == "Flat" else 0
-                type_house = 1 if type_building == "Individual House" else 0
-
-                # Меблировка
-                furnished = st.selectbox("Меблировка", [
-                    "Furnished", "Semi-Furnished", "Unfurnished", "unknown"
-                ])
-                furn_furnished = 1 if furnished == "Furnished" else 0
-                furn_semi = 1 if furnished == "Semi-Furnished" else 0
-                furn_unfurnished = 1 if furnished == "Unfurnished" else 0
-                furn_unknown = 1 if furnished == "unknown" else 0
-
-                # Новый или старый дом
-                neworold = st.selectbox("Состояние дома", ["New", "Old"])
-                new_home = 1 if neworold == "New" else 0
-                old_home = 1 if neworold == "Old" else 0
-
-                # Добавление недостающих признаков
+                # Добавление всех введенных данных в DataFrame
                 input_data = pd.DataFrame({
-                    'price': [price],
-                    'area': [area],
-                    'latitude': [latitude],
-                    'longitude': [longitude],
-                    'bedrooms': [bedrooms],
-                    'bathrooms': [bathrooms],
-                    'balcony': [balcony],
-                    'parking': [parking],
-                    'lift': [lift],
-                    'Status_Ready to Move': [status_ready],
-                    'Status_Under Construction': [status_under],
-                    'Status_unknown': [status_unknown],
-                    'type_of_building_Flat': [type_flat],
-                    'type_of_building_Individual House': [type_house],
-                    'Furnished_status_Furnished': [furn_furnished],
-                    'Furnished_status_Semi-Furnished': [furn_semi],
-                    'Furnished_status_Unfurnished': [furn_unfurnished],
-                    'Furnished_status_unknown': [furn_unknown],
-                    'neworold_New': [new_home],
-                    'neworold_Old': [old_home],
+                    'manufacturer_name': [manufacturer_name],
+                    'model_name': [model_name],
+                    'transmission': [transmission],
+                    'color': [color],
+                    'odometer_value': [odometer_value],
+                    'year_produced': [year_produced],
+                    'engine_fuel': [engine_fuel],
+                    'engine_has_gas': [engine_has_gas],
+                    'engine_type': [engine_type],
+                    'engine_capacity': [engine_capacity],
+                    'body_type': [body_type],
+                    'has_warranty': [has_warranty],
+                    'state': [state],
+                    'drivetrain': [drivetrain],
+                    'is_exchangeable': [is_exchangeable],
+                    'location_region': [location_region],
+                    'number_of_photos': [number_of_photos],
+                    'up_counter': [up_counter],
                 })
+
+                # Преобразуем категориальные признаки в one-hot
+                input_data = pd.get_dummies(input_data, drop_first=True)
 
                 # Добавляем недостающие признаки с нулевыми значениями
                 missing_columns = set(model_columns) - set(input_data.columns)
                 for col in missing_columns:
-                    input_data[col] = 0  # Добавляем недостающие признаки с нулевым значением
+                    input_data[col] = 0  # Добавляем недостающие признаки с нулевыми значениями
 
-                # Приводим признаки в правильный порядок
+                # Приводим порядок признаков к нужному
                 input_data = input_data[model_columns]  # Применяем правильный порядок
 
                 # Получаем предсказание
@@ -171,4 +172,4 @@ else:
                     # Форматируем число с правильным разделением тысяч
                     formatted_prediction = "{:,.0f}".format(prediction).replace(",", " ")
 
-                    st.success(f"Оценочная стоимость: **{formatted_prediction} рупий**")
+                    st.success(f"Оценочная стоимость: **{formatted_prediction} долларов**")

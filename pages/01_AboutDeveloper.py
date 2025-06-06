@@ -4,7 +4,7 @@ import streamlit as st
 st.set_page_config(page_title="Информация о студенте", layout="wide")
 
 # Заголовок
-st.markdown("<h1 style='text-align: center;'> Информацией о разработчике моделей ML</h1>", unsafe_allow_html=True)
+st.markdown("<h1 style='text-align: center;'> Информацией о студенте</h1>", unsafe_allow_html=True)
 
 # Основная информация
 st.markdown("""

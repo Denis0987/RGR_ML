@@ -8,7 +8,7 @@ st.set_page_config(page_title="Дашборд анализа данных", layo
 # Заголовок страницы
 st.title(" Дашборд анализа данных и моделирования")
 st.markdown("""
-На этой странице представлены основные результаты анализа данных и оценки моделей машинного обучения для задачи прогнозирования цены дома.
+На этой странице представлены основные результаты анализа данных и оценки моделей машинного обучения для задачи прогнозирования цены втомобиля.
 """)
 
 image_dir = "figures"
@@ -16,45 +16,54 @@ image_dir = "figures"
 def display_image_with_caption(image_path, caption):
     image = Image.open(os.path.join(image_dir, image_path))
     st.image(image, caption=caption, use_container_width=True)
-
-# Создание сетки для изображений
-col1, col2 = st.columns(2)
-
+    
 st.subheader("Aнализ данных:")
-    # corr_matrix.png
+# Создание сетки для изображений
+# corr_matrix_all.png
 display_image_with_caption(
-    "corr_matrix.png",
-    "Тепловая карта корреляций\n"
+    "corr_matrix_all.png",
+    "Тепловая карта корреляций (для всех признаков)\n"
 )
 st.write("Показывает взаимосвязь между признаками.")
 st.write("Цвета отражают силу корреляции: от -1 до 1.")
 st.write("Выявляет наиболее значимые признаки.")
 
+# corr_matrix.png
+display_image_with_caption(
+    "corr_matrix.png",
+    "Тепловая карта корреляций (для признаков влияющих на цену)\n"
+)
+st.write("Показывает взаимосвязь между важными признаками.")
+st.write("Цвета отражают силу корреляции: от -1 до 1.")
+    
+# Создание сетки для изображений
+col1, col2 = st.columns(2)
+
 with col1:
 # Размещение графиков 
     st.subheader("Aнализ влияние важных признаков на цену:")
-     # scatter_area_target.png
+     # scatter_year_produced_price_usd.png
     display_image_with_caption(
-        "scatter_area_target.png",
-        "Зависимость price от area\n"
+        "scatter_year_produced_price_usd.png",
+        "Зависимость price_usd от year_produced\n"
     )
-    st.write("Помогает понять,что площадь — один из ключевых факторов для оценки цены")
+    st.write("Помогает понять,что с увеличением года производства цена автомобиля значительно возрастает.")
     
-    # boxplot_Bedrooms_price.png
+    # boxplot_car_age.png
     display_image_with_caption(
-        "boxplot_Bedrooms_price.png",
-        "Зависимость price от Bedrooms.\n"
+        "boxplot_car_age.png",
+        "Анализ важного признака- car_age.\n"
     )
-    st.write("Позволяет наглядно показать, что число спален — важный фактор для цены, но не единственный (так как разброс большой):")
+    st.write("Большинство автомобилей имеет возраст около 20 лет, с некоторыми выбросами старых автомобилей (более 30 лет)")
     
     # pairplot.png
     display_image_with_caption(
         "pairplot.png",
-        "Взаимосвязь важных признаков на целевую переменную.\n"
+        "Взаимосвязь важных признаков влияющих на целевую переменную.\n"
     )
-    st.write("Видна положительная зависимость (чем больше площадь, тем выше цена), но разброс достаточно велик")
-    st.write("По вертикальным полосам видно, что большее количество спален связано с ростом цены,но внутри каждой группы спален цены сильно варьируются.")
-    st.write("Наличие ступенчатости: у квартир с большим числом спален — обычно больше площадь,но внутри каждого значения bedrooms разброс по area тоже заметный.")
+    st.write("Молодые автомобили имеют более высокие цены")
+    st.write("Избыток автомобилей с возрастом около 20 лет, что также подтверждается распределением на диагональных гистограммах")
+    st.write("Цены на старые автомобили значимо падают с возрастом, что ожидаемо")
     
 with col2:
     st.subheader("Oценки моделей машинного обучения (на предобработанных данных):")
@@ -70,10 +79,10 @@ with col2:
         "Таблица метрик для Gradient Boosting Regressor. \n"
     )
 
-    # xgb_metrics_table.png
+    # catboost_metrics_table.png
     display_image_with_caption(
-        "xgb_metrics_table.png",
-        "Таблица метрик для XGBRegressor. \n"
+        "catboost_metrics_table.png",
+        "Таблица метрик для CatBoost Regressor. \n"
     )
     
     # bbagging_metrics_table.png
@@ -85,7 +94,7 @@ with col2:
     # stacking_metrics_table.png
     display_image_with_caption(
         "stacking_metrics_table.png",
-        "Таблица метрик для StackingRegressor. \n"
+        "Таблица метрик для Stacking Regressor. \n"
     )
 
     # mlp_metrics_table.png
@@ -96,3 +105,4 @@ with col2:
     st.write("**R² (R-squared)**: Мера объяснённой дисперсии.")
     st.write("**RMSE (Root Mean Squared Error)**: Чем меньше, тем лучше точность модели.")
     st.write("**MAE (Mean Absolute Error)**: Средняя абсолютная ошибка.")
+
