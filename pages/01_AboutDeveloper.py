@@ -16,7 +16,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # Фото (если есть)
-st.image("photo_2025-06-07_07-21-00.jpg", caption="Фото студента", width=300)
+st.image("../photo_2025-06-07_07-21-00.jpg", caption="Фото студента", width=300)
 
 # Подвал
 st.markdown("---")
